@@ -34,9 +34,9 @@ function updatereadouts {
     print "Current throttle value: " + pid:output.
     print "PID loop error: " + pid:error.
     // print "PID oscillation: " + changerate + " /s".
-    print "P: " + pid:kp.
-    print "I: " + pid:ki.
-    print "D: " + pid:kd.
+    print "P: " + pid:pterm.
+    print "I: " + pid:iterm.
+    print "D: " + pid:dterm.
     print "Sample: " + i.
     set lastoutput to pid:output.
     set lasttime to pid:lastsampletime.
