@@ -1,7 +1,4 @@
 @lazyGlobal off.
-// TODO: Create some sort of PID controller to automate the approach
-// Currently this script only makes you face the docking port, however I plan to implement the
-// rest of the docking procedure
 
 // God this script is a mess
 
@@ -34,9 +31,7 @@ print "The ships dock name is: " + shipdock:name.
 
 mydock:controlfrom().
 
-lock steering to lookDirUp(-shipdock:portfacing:vector, shipdock:portfacing:upvector).
-
-
+lock steering to lookDirUp(-shipdock:portfacing:vector, up:forevector). // Ironically `up` in this case means sideways 
 
 
 
@@ -50,30 +45,24 @@ lock steering to lookDirUp(-shipdock:portfacing:vector, shipdock:portfacing:upve
 // PID controller for y axis
 local ykp is 1.
 local yki is 0.
-local ykd is 0.5.
+local ykd is 0.75.
 
 local ypid is pidLoop(ykp, yki, ykd, -1, 1).
 set ypid:setpoint to 0.
 
-// PID controller for z axis
-local zkp is 1.
-local zki is 0.
-local zkd is 0.5.
-
-local zpid is pidLoop(zkp, zki, zkd, -1, 1).
-set zpid:setpoint to 0.
-
 // PID controller for x axis
 local xkp is 1.
 local xki is 0.
-local xkd is 0.
+local xkd is 0.75.
 
 local xpid is pidLoop(xkp, xki, xkd, -1, 1).
 set xpid:setpoint to 0.
 
-local dockvector is vecDraw(
+lock rotatedDock to shipdock:nodePosition * -ship:facing.
+
+local dockVector is vecDraw(
     V(0,0,0),
-    { return shipdock:position. },
+    { return shipdock:nodePosition. },
     rgb(1,0,1),
     "Dock is this way",
     1.0,
@@ -85,9 +74,9 @@ local dockvector is vecDraw(
 
 function pidreadouts {
     clearScreen.
-    print "Node y position: " + shipdock:nodeposition:y.
-    print "Node x position: " + shipdock:nodeposition:x.
-    print "Node z position: " + shipdock:nodeposition:z.
+    print "Node y position: " + rotatedDock:y.
+    print "Node x position: " + rotatedDock:x.
+    print "Node z position: " + rotatedDock:z.
     print "-------- y PID loop -------".
     print "y PID loop error: " + ypid:error.
     print "y PID loop output: " + ypid:output.
@@ -95,14 +84,6 @@ function pidreadouts {
     print "y P: " + ypid:pterm.
     print "y I: " + ypid:iterm.
     print "y D: " + ypid:dterm.
-
-    print "-------- z PID loop -------".
-    print "z PID loop error: " + zpid:error.
-    print "z PID loop output: " + zpid:output.
-
-    print "z P: " + zpid:pterm.
-    print "z I: " + zpid:iterm.
-    print "z D: " + zpid:dterm.
 
     print "-------- x PID loop -------".
     print "x PID loop error: " + xpid:error.
@@ -128,15 +109,23 @@ local startime is time:seconds.
 
 until i = samplecount {
     if mydock:haspartner { break. }
-    ypid:update(time:seconds, shipdock:nodeposition:y).
-    xpid:update(time:seconds, shipdock:nodeposition:x).
-    zpid:update(time:seconds, shipdock:nodeposition:z).
-    // set ship:control:starboard to ypid:output.
-    // set ship:control:top to zpid:output * -1.
-    logpiddata(zpid).
+    ypid:update(time:seconds, rotatedDock:y).
+    xpid:update(time:seconds, rotatedDock:x).
+    set ship:control:starboard to -xpid:output.
+    set ship:control:top to -ypid:output.
+    logpiddata(xpid).
     pidreadouts().
-    set i to i + 1.
-    wait 0.001.
+    
+    // This massive if statement checks if the two ships are lined up and their difference in velocity is
+    // less than 0.25 m/s
+    if abs(rotatedDock:y) < 0.1 and
+    abs(rotatedDock:x) < 0.1 and 
+    abs(ship:velocity:orbit:mag - shipdock:ship:velocity:orbit:mag) < 0.25 {
+        set ship:control:fore to 0.1. // I hope this wont cause any issues.
+    }
+
+    // set i to i + 1.
+    wait 0.
 }
 
 set ship:control:starboard to 0.
